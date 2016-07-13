@@ -1,12 +1,12 @@
 ﻿namespace FSharpVSPowerTools.ProjectSystem
 
 open System
-open Microsoft.VisualStudio.Text
+
 open Microsoft.VisualStudio.Text.Editor
 open System.Threading
 open System.Windows.Threading
 open FSharpVSPowerTools
-
+open FSharp.EditingServices.BufferModel
 [<RequireQualifiedAccess>]
 module ViewChange =    
     open Microsoft.VisualStudio.Text.Tagging

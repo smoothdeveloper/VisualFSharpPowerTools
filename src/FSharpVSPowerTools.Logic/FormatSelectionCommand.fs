@@ -1,8 +1,7 @@
 ﻿namespace FSharpVSPowerTools.CodeFormatting
-
+open FSharp.EditingServices.BufferModel
 open System
 open Microsoft.FSharp.Compiler.Range
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Editor
 open Fantomas.FormatConfig
 open FSharpVSPowerTools.ProjectSystem
@@ -52,7 +51,7 @@ type FormatSelectionCommand(getConfig: Func<FormatConfig>) =
                          OldTextLength = endIndex - startIndex
                          NewText = formattedSelection }
             else
-                let startPos = TextUtils.getFSharpPos(x.TextView.Selection.Start)
+                let startPos = TextUtils.getFSharpPos(VirtualSnapshotPoint x.TextView.Selection.Start)
                 let startIndex = x.TextView.Selection.Start.Position.Position
                 let endIndex = x.TextView.Selection.End.Position.Position
                 let endPos = TextUtils.getFSharpPos(VirtualSnapshotPoint(x.TextBuffer.CurrentSnapshot, endIndex-1))
@@ -66,16 +65,16 @@ type FormatSelectionCommand(getConfig: Func<FormatConfig>) =
 
     override x.SetNewCaretPosition(caretPos, scrollBarPos, _originalSnapshot) =
         let currentSnapshot = x.TextBuffer.CurrentSnapshot
-        if isFormattingCursorPosition || caretPos = x.TextView.Selection.Start.Position then
+        if isFormattingCursorPosition || caretPos.VSObject = x.TextView.Selection.Start.Position then
             // The caret is at the start of selection, its position is unchanged
             let newSelStartPos = selStartPos
             let newActivePoint = new VirtualSnapshotPoint(currentSnapshot, newSelStartPos)
-            x.TextView.Caret.MoveTo(newActivePoint) |> ignore
+            x.TextView.Caret.MoveTo(newActivePoint.VSObject) |> ignore
         else
             // The caret is at the end of selection, its offset from the end of text is unchanged
             let newSelEndPos = currentSnapshot.Length - selOffsetFromEnd
             let newAnchorPoint = VirtualSnapshotPoint(currentSnapshot, newSelEndPos)
-            x.TextView.Caret.MoveTo(newAnchorPoint) |> ignore
+            x.TextView.Caret.MoveTo(newAnchorPoint.VSObject) |> ignore
         x.TextView.ViewScroller.ScrollViewportVerticallyByLines(ScrollDirection.Down, scrollBarPos)
 
         if not isFormattingCursorPosition then
@@ -89,4 +88,4 @@ type FormatSelectionCommand(getConfig: Func<FormatConfig>) =
             let newAnchorPointPos = if isReversedSelection then newSelEndPos else newSelStartPos
             let newActivePoint = VirtualSnapshotPoint(currentSnapshot, newActivePointPos) 
             let newAnchorPoint = VirtualSnapshotPoint(currentSnapshot, newAnchorPointPos)
-            x.TextView.Selection.Select(newAnchorPoint, newActivePoint)
+            x.TextView.Selection.Select(newAnchorPoint.VSObject, newActivePoint.VSObject)

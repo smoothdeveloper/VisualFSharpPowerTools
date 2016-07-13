@@ -1,13 +1,12 @@
 ﻿namespace FSharpVSPowerTools.DepthColorizer
    
 open System
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Tagging
 open FSharpVSPowerTools
 open FSharpVSPowerTools.ProjectSystem
 open System.Diagnostics
 open FSharpVSPowerTools.AsyncMaybe
-
+open FSharp.EditingServices.BufferModel
 // The tag that carries metadata about F# color-regions.
 type DepthRegionTag(info: int * int * int * int) = 
     interface ITag
@@ -19,7 +18,7 @@ type DepthRegionTag(info: int * int * int * int) =
 type private DepthTaggerState =
     { Snapshot: ITextSnapshot
       Tags: ITagSpan<DepthRegionTag>[]
-      Results: (ITrackingSpan * (int * int * int * int)) list }
+      Results: (VSITrackingSpan * (int * int * int * int)) list }
 
 type DepthTagger
      (
@@ -53,8 +52,7 @@ type DepthTagger
                         let endLine = snapshot.GetLineFromLineNumber (min (line - 1) (snapshot.LineCount - 1))
                         let endPoint = endLine.Start.Add (min endCol endLine.Length)
                         let trackingSpan = 
-                            snapshot.CreateTrackingSpan
-                                (SnapshotSpan(startPoint, endPoint).Span, SpanTrackingMode.EdgeExclusive)
+                            snapshot.CreateEdgeExclusiveTrackingSpan(SnapshotSpan(startPoint, endPoint).Span)
                         (trackingSpan, info) :: res
                     with e -> 
                         Logging.logException e
@@ -66,16 +64,16 @@ type DepthTagger
             debug "[DepthTagger] Firing tags changed"
             // Switch back to UI thread before firing events
             return! callInUIContext (fun _ ->
-                tagsChanged.Trigger (self, SnapshotSpanEventArgs (SnapshotSpan (snapshot, 0, snapshot.Length)))) |> liftAsync
+                tagsChanged.Trigger (self, Microsoft.VisualStudio.Text.SnapshotSpanEventArgs ((SnapshotSpan (snapshot, 0, snapshot.Length)).VSObject))) |> liftAsync
         } |> Async.Ignore
    
     let docEventListener = new DocumentEventListener ([ViewChange.bufferEvent buffer], 500us, refreshTags) 
     
     let getTags (spans: NormalizedSnapshotSpanCollection) = 
-        match spans |> Seq.toList, state with
+        match spans.VSObject |> Seq.toList, state with
         | [], _ -> [||]
         | firstSpan :: _, Some state 
-            when state.Snapshot === firstSpan.Snapshot && state.Results === lastResults.Value ->
+            when state.Snapshot.VSObject === firstSpan.Snapshot && state.Results === lastResults.Value ->
             debug "[DepthTagger] Using cached results"
             state.Tags
         | firstSpan :: _, _ ->
@@ -83,11 +81,11 @@ type DepthTagger
             let snapshot = firstSpan.Snapshot
             let tags = [| for span, depth in lastResults.Value ->
                             TagSpan(span.GetSpan(snapshot), DepthRegionTag(depth)) :> ITagSpan<_> |]
-            state <- Some { Snapshot = snapshot; Tags = tags; Results = lastResults.Value }
+            state <- Some { Snapshot = ITextSnapshot snapshot; Tags = tags; Results = lastResults.Value }
             tags
 
     interface ITagger<DepthRegionTag> with
-        member __.GetTags spans = protectOrDefault (fun _ -> getTags spans :> _) Seq.empty
+        member __.GetTags spans = protectOrDefault (fun _ -> getTags (NormalizedSnapshotSpanCollection spans) :> _) Seq.empty
         [<CLIEvent>]
         member __.TagsChanged = tagsChanged.Publish
 

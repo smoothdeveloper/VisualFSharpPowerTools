@@ -2,11 +2,10 @@
 
 open System
 open Microsoft.FSharp.Compiler
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Operations
 open FSharpVSPowerTools.ProjectSystem
-
+open FSharp.EditingServices.BufferModel
 [<AllowNullLiteral>]
 type CodeFormattingServices(editorOptionsFactory: IEditorOptionsFactoryService, 
                             editorOperationsFactoryService: IEditorOperationsFactoryService,

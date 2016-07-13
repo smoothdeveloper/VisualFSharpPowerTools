@@ -1,16 +1,26 @@
-﻿namespace FSharpVSPowerTools.CodeGeneration
-
-open System
-open System.IO
-open System.CodeDom.Compiler
-open FSharpVSPowerTools
-open Microsoft.FSharp.Compiler.Ast
-open Microsoft.FSharp.Compiler.Range
-open Microsoft.FSharp.Compiler.SourceCodeServices
+﻿namespace FSharpVSPowerTools
 
 [<Measure>] type Line0
 [<Measure>] type Line1
 
+[<AutoOpen>]
+module IndexTweaking =
+  let makeLine1 (l: int) = l * 1<Line1>
+  let makeLine0 (l: int) = l * 1<Line0>
+  let toLine1 (l: int<Line0>) : int<Line1> = makeLine1 ((int l) + 1)
+  let toLine0 (l: int<Line1>) : int<Line0> = makeLine0 ((int l) - 1)
+  
+
+namespace FSharpVSPowerTools.CodeGeneration
+
+open System
+open System.IO
+open System.CodeDom.Compiler
+
+open Microsoft.FSharp.Compiler.Ast
+open Microsoft.FSharp.Compiler.Range
+open Microsoft.FSharp.Compiler.SourceCodeServices
+open FSharpVSPowerTools
 type IDocument =
     abstract FullName: string
     abstract GetText: unit -> string

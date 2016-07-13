@@ -43,7 +43,7 @@ type FormatDocumentCommand(getConfig: Func<FormatConfig>) =
         let newLine = currentSnapshot.GetLineFromLineNumber(newLineNo)
         let newColumn = min column newLine.Length
         let newCaretPos = newLine.Start.Add(newColumn)
-        let caretPolet = VirtualSnapshotPoint(currentSnapshot, int newCaretPos)
+        let caretPolet = VirtualSnapshotPoint(currentSnapshot.VSObject, int newCaretPos)
         x.TextView.Caret.MoveTo(caretPolet) |> ignore
 
         // Assume that the document scales in a linear way

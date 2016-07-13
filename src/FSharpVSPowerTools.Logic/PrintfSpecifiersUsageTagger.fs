@@ -1,7 +1,7 @@
 ﻿namespace FSharpVSPowerTools.PrintfSpecifiersHighlightUsage
 
 open System
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Tagging
 open FSharpVSPowerTools
@@ -29,8 +29,8 @@ type PrintfSpecifiersUsageTagger
     let buffer = view.TextBuffer
 
     let printfSpecifierUseToSpans (u: PrintfSpecifierUse): SnapshotSpan[] =
-        [| fromFSharpRange buffer.CurrentSnapshot u.SpecifierRange
-           fromFSharpRange buffer.CurrentSnapshot u.ArgumentRange |]
+        [| fromFSharpRange (ITextSnapshot buffer.CurrentSnapshot) u.SpecifierRange
+           fromFSharpRange (ITextSnapshot buffer.CurrentSnapshot) u.ArgumentRange |]
         |> Array.choose id
     
     let findUsagesAtPoint (point: SnapshotPoint) (usages: PrintfSpecifierUse[]): PrintfSpecifierUse option =
@@ -84,18 +84,18 @@ type PrintfSpecifiersUsageTagger
                             onCaretMoveListener.Force() |> ignore
             })
 
-    let bufferChangedEventListener = new DocumentEventListener ([ViewChange.bufferEvent buffer], 100us, onBufferChanged)
+    let bufferChangedEventListener = new DocumentEventListener ([ViewChange.bufferEvent (ITextBuffer buffer)], 100us, onBufferChanged)
     
     let tagSpan span = TagSpan<PrintfSpecifiersUsageTag>(span, PrintfSpecifiersUsageTag()) :> ITagSpan<_>
 
     let getTags (targetSpans: NormalizedSnapshotSpanCollection): ITagSpan<PrintfSpecifiersUsageTag> list = 
         match spans with
-        | Some spans when spans.Count > 0 -> 
-            let targetSnapshot = targetSpans.[0].Snapshot
+        | Some spans when spans.VSObject.Count > 0 -> 
+            let targetSnapshot = targetSpans.VSObject.[0].Snapshot
             let spans = 
-                if targetSnapshot = spans.[0].Snapshot then spans
+                if targetSnapshot = spans.VSObject.[0].Snapshot then spans
                 else NormalizedSnapshotSpanCollection
-                         (spans |> Seq.map (fun span -> span.TranslateTo(targetSnapshot, SpanTrackingMode.EdgeExclusive)))
+                         (spans.VSObject |> Seq.map (fun span -> span.TranslateTo(targetSnapshot, SpanTrackingMode.EdgeExclusive)))
             
             spans |> Seq.map tagSpan |> Seq.toList
         | _ -> []

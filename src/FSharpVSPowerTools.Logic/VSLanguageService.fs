@@ -1,54 +1,9 @@
-﻿namespace FSharp.EditingServices.BufferModel
-
-type VSSnapshotSpan  = Microsoft.VisualStudio.Text.SnapshotSpan
-type VSSnapshotPoint = Microsoft.VisualStudio.Text.SnapshotPoint
-type VSTextSnapshot  = Microsoft.VisualStudio.Text.ITextSnapshot
-
-type ITextSnapshot(snapshot: VSTextSnapshot) = 
-  class
-    member x.snapshotSpanFromRange (lineStart, colStart, lineEnd, colEnd) =
-        let startPos = snapshot.GetLineFromLineNumber(lineStart).Start.Position + colStart
-        let endPos = snapshot.GetLineFromLineNumber(lineEnd).Start.Position + colEnd
-        SnapshotSpan(snapshot, startPos, endPos - startPos)
-  end
-and SnapshotSpan(snapshot: VSTextSnapshot, startPos, length) =
-  class
-
-  end
-and SnapshotPoint(point: VSSnapshotPoint) =
-  class
-
-    let line () = point.Snapshot.GetLineNumberFromPosition point.Position
-    let col  () = point.Position - point.GetContainingLine().Start.Position
-    let line_text () = point.GetContainingLine().GetText()
-    
-    member x.ColumnIndex        = col ()
-    member x.LineIndex          = line ()
-    member x.ContainingLineText = line_text
-
-  end
-
-namespace Microsoft.VisualStudio.Text
-
-module RefactorExtensions = 
-  type Microsoft.VisualStudio.Text.ITextSnapshot
-  with
-    member x.snapshotSpanFromRange = FSharp.EditingServices.BufferModel.ITextSnapshot(x).snapshotSpanFromRange
-
-  type Microsoft.VisualStudio.Text.SnapshotPoint
-  with
-    member x.ColumnIndex        = FSharp.EditingServices.BufferModel.SnapshotPoint(x).ColumnIndex
-    member x.LineIndex          = FSharp.EditingServices.BufferModel.SnapshotPoint(x).LineIndex
-    member x.ContainingLineText = FSharp.EditingServices.BufferModel.SnapshotPoint(x).ContainingLineText
-
-
-namespace FSharpVSPowerTools.ProjectSystem
-
+﻿namespace FSharpVSPowerTools.ProjectSystem
+open FSharp.EditingServices.BufferModel
 open FSharpVSPowerTools
 open FSharp.ViewModule.Progress
 open Microsoft.VisualStudio.Editor
 open System.ComponentModel.Composition
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Shell
 open Microsoft.VisualStudio.Shell.Interop
 open Microsoft.VisualStudio.TextManager.Interop
@@ -126,7 +81,7 @@ type VSLanguageService
             if skipLexCache then
                 Lexer.queryLexState source defines line
             else
-                let vsColorState = editorFactory.GetBufferAdapter(textBuffer) :?> IVsTextColorState
+                let vsColorState = editorFactory.GetBufferAdapter(textBuffer.VSObject) :?> IVsTextColorState
                 let colorState = fsharpLanguageService.GetColorStateAtStartOfLine(vsColorState, line)
                 fsharpLanguageService.LexStateOfColorState(colorState)
         with e ->
@@ -264,7 +219,7 @@ type VSLanguageService
             return symbol, results
         }
 
-    member __.CreateLexer (fileName, snapshot, args) =
+    member __.CreateLexer (fileName, (snapshot: ITextSnapshot), args) =
         maybe {
             let lineStart, _, lineEnd, _ = SnapshotSpan(snapshot, 0, snapshot.Length).ToRange()
             

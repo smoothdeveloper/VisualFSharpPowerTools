@@ -39,7 +39,7 @@ type ImplementInterface
     let mutable currentWord: SnapshotSpan option = None
     let mutable suggestions: ISuggestion list = []
     
-    let buffer = view.TextBuffer
+    let buffer = FSharp.EditingServices.BufferModel.ITextBuffer view.TextBuffer
 
     let queryInterfaceState (point: SnapshotPoint) (project: IProjectProvider) =
         asyncMaybe {
@@ -121,8 +121,8 @@ type ImplementInterface
             if hasTypeCheckError && List.length membersAndRanges <> Seq.length interfaceMembers then
                 let word = 
                     let currentSnapshot = buffer.CurrentSnapshot
-                    if currentSnapshot = word.Snapshot then word
-                    else word.TranslateTo(currentSnapshot, SpanTrackingMode.EdgeExclusive)
+                    if currentSnapshot.VSObject = word.Snapshot then word
+                    else word.TranslateTo(currentSnapshot.VSObject, SpanTrackingMode.EdgeExclusive)
 
                 let createSuggestion name verboseMode =
                     { new ISuggestion with

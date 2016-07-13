@@ -5,6 +5,7 @@ open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Tagging
 open Microsoft.VisualStudio.Text.Operations
 open Microsoft.VisualStudio.Language.Intellisense
+open Microsoft.VisualStudio.Text.RefactorExtensions
 open System
 open FSharpVSPowerTools
 open FSharpVSPowerTools.CodeGeneration
@@ -57,11 +58,11 @@ type UnionPatternMatchCaseGenerator
                   member __.Text = Resource.unionPatternMatchCaseCommandName }
         ]
 
-    let project() = projectFactory.CreateForDocument buffer doc.FilePath
+    let project() = projectFactory.CreateForDocument (FSharp.EditingServices.BufferModel.ITextBuffer buffer) doc.FilePath
 
     let updateAtCaretPosition (CallInUIContext callInUIContext) =
         async {
-            match buffer.GetSnapshotPoint view.Caret.Position, currentWord with
+            match buffer.GetSnapshotPoint(view.Caret.Position), currentWord with
             | Some point, Some word when word.Snapshot = view.TextSnapshot && point.InSpan word -> return ()
             | (Some _ | None), _ ->
                 let! result = asyncMaybe {
@@ -72,19 +73,19 @@ type UnionPatternMatchCaseGenerator
                     do! match currentWord with
                         | None -> Some()
                         | Some oldWord -> 
-                            if word <> oldWord then Some()
+                            if word.VSObject <> oldWord then Some()
                             else None
 
-                    currentWord <- Some word
+                    currentWord <- Some word.VSObject
                     suggestions <- []
                     let! source = openDocumentTracker.TryGetDocumentText doc.FilePath
                     let vsDocument = VSDocument(source, doc.FilePath, point.Snapshot)
                     let! symbolRange, patMatchExpr, unionTypeDefinition, insertionPos =
-                        tryFindUnionDefinitionFromPos codeGenService project point vsDocument
+                        tryFindUnionDefinitionFromPos codeGenService project (FSharp.EditingServices.BufferModel.SnapshotPoint point) vsDocument
                     // Recheck cursor position to ensure it's still in new word
                     let! point = buffer.GetSnapshotPoint view.Caret.Position
                     if point.InSpan symbolRange && shouldGenerateUnionPatternMatchCases patMatchExpr unionTypeDefinition then
-                        return! Some(patMatchExpr, unionTypeDefinition, insertionPos, word.Snapshot)
+                        return! Some(patMatchExpr, unionTypeDefinition, insertionPos, word.Snapshot.VSObject)
                     else
                         return! None
                 } 

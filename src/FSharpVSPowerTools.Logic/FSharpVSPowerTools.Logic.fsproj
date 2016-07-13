@@ -85,6 +85,8 @@
     <Compile Include="Logger.fs">
       <Link>Common/Logger.fs</Link>
     </Compile>
+    <Compile Include="Common\FSharp.EditingServices.BufferModel.fs" />
+    <Compile Include="Common\Microsoft.VisualStudio.Text.RefactorExtensions.fs" />
     <Compile Include="VSUtils.fs">
       <Link>Common/VSUtils.fs</Link>
     </Compile>

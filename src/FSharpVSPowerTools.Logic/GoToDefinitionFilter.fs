@@ -1,11 +1,10 @@
 ﻿namespace FSharpVSPowerTools.Navigation
-
+open FSharp.EditingServices.BufferModel
 open System
 open System.IO
 open System.Threading
 open System.Security
 open System.Collections.Generic
-open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio
 open Microsoft.VisualStudio.TextManager.Interop
 open Microsoft.VisualStudio.OLE.Interop
@@ -36,7 +35,7 @@ type internal UrlChangeEventArgs(url: string) =
 type GoToDefinitionFilter
     (
         doc: ITextDocument,
-        view: IWpfTextView, 
+        view: Microsoft.VisualStudio.Text.Editor.IWpfTextView, 
         vsLanguageService: VSLanguageService, 
         serviceProvider: System.IServiceProvider,                          
         projectFactory: ProjectFactory,
@@ -50,14 +49,14 @@ type GoToDefinitionFilter
     let mutable currentUrl = None
 
     let dte = serviceProvider.GetDte()
-    let textBuffer = view.TextBuffer
-    let project() = projectFactory.CreateForDocument view.TextBuffer doc.FilePath
+    let textBuffer = ITextBuffer view.TextBuffer
+    let project() = projectFactory.CreateForDocument textBuffer doc.FilePath
 
     let getDocumentState () =
         async {
             let projectItems = maybe {
                 let! project = project()
-                let! caretPos = textBuffer.GetSnapshotPoint view.Caret.Position
+                let! caretPos = textBuffer.GetSnapshotPoint (CaretPosition(view.Caret.Position))
                 let! span, symbol = vsLanguageService.GetSymbol(caretPos, doc.FilePath, project)
                 return project, span, symbol }
 
@@ -207,7 +206,7 @@ type GoToDefinitionFilter
                     match navigationPreference with
                     | NavigationPreference.Metadata ->
                         if shouldGenerateDefinition fsSymbolUse.Symbol then
-                            return! metadataService.NavigateToMetadata(project, textBuffer, parseTree, span, fsSymbolUse)
+                            return! metadataService.NavigateToMetadata(project, textBuffer.VSObject, parseTree, span, fsSymbolUse)
                     | NavigationPreference.SymbolSourceOrMetadata
                     | NavigationPreference.SymbolSource as pref ->   
                         let symbol = fsSymbolUse.Symbol
@@ -231,7 +230,7 @@ type GoToDefinitionFilter
                                 match pref with
                                 | NavigationPreference.SymbolSourceOrMetadata ->
                                     if shouldGenerateDefinition symbol then
-                                        return! metadataService.NavigateToMetadata(project, textBuffer, parseTree, span, fsSymbolUse)
+                                        return! metadataService.NavigateToMetadata(project, textBuffer.VSObject, parseTree, span, fsSymbolUse)
                                 | _ ->
                                     let statusBar = serviceProvider.GetService<IVsStatusbar, SVsStatusbar>()
                                     statusBar.SetText(Resource.goToDefinitionNoSourceSymbolMessage) |> ignore

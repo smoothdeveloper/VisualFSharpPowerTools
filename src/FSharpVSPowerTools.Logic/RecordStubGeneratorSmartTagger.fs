@@ -1,6 +1,7 @@
 ﻿namespace FSharpVSPowerTools.Refactoring
 
 open Microsoft.VisualStudio.Text
+open Microsoft.VisualStudio.Text.RefactorExtensions
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Tagging
 open Microsoft.VisualStudio.Text.Operations
@@ -30,8 +31,8 @@ type RecordStubGenerator
     let mutable currentWord: SnapshotSpan option = None
     let mutable suggestions: ISuggestion list = []
     
-    let buffer = view.TextBuffer
-    let codeGenService: ICodeGenerationService<_, _, _> = upcast CodeGenerationService(vsLanguageService, buffer)
+    let buffer = FSharp.EditingServices.BufferModel.ITextBuffer view.TextBuffer
+    let codeGenService: ICodeGenerationService<_, _, _> = upcast CodeGenerationService(vsLanguageService, buffer.VSObject)
 
     // Check whether the record has been fully defined
     let shouldGenerateRecordStub (recordExpr: RecordExpr) (entity: FSharpEntity) =
@@ -55,10 +56,10 @@ type RecordStubGenerator
 
         transaction.Complete()
 
-    let getSuggestions (recordExpr, entity, insertionParams, snapshot) =
+    let getSuggestions (recordExpr, entity, insertionParams, snapshot:FSharp.EditingServices.BufferModel.ITextSnapshot) =
         [ 
             { new ISuggestion with
-                  member __.Invoke() = handleGenerateRecordStub snapshot recordExpr insertionParams entity
+                  member __.Invoke() = handleGenerateRecordStub snapshot.VSObject recordExpr insertionParams entity
                   member __.NeedsIcon = false
                   member __.Text = Resource.recordGenerationCommandName }
         ]
@@ -70,28 +71,28 @@ type RecordStubGenerator
     // - Identify the '{' in 'let x: MyRecord = { }'
     let updateAtCaretPosition (CallInUIContext callInUIContext) =
         async {
-            match buffer.GetSnapshotPoint view.Caret.Position, currentWord with
-            | Some point, Some word when word.Snapshot = view.TextSnapshot && point.InSpan word -> return ()
+            match buffer.GetSnapshotPoint (FSharp.EditingServices.BufferModel.CaretPosition view.Caret.Position), currentWord with
+            | Some point, Some word when word.Snapshot = view.TextSnapshot && point.InSpan (FSharp.EditingServices.BufferModel.SnapshotSpan word) -> return ()
             | (Some _ | None), _ ->
                 let! result = asyncMaybe {
-                    let! point = buffer.GetSnapshotPoint view.Caret.Position
+                    let! point = buffer.GetSnapshotPoint (FSharp.EditingServices.BufferModel.CaretPosition view.Caret.Position)
                     let! project = project()
                     let! word, _ = vsLanguageService.GetSymbol (point, doc.FilePath, project) 
                     
                     do! match currentWord with
                         | None -> Some()
                         | Some oldWord -> 
-                            if word <> oldWord then Some()
+                            if word.VSObject <> oldWord then Some()
                             else None
 
-                    currentWord <- Some word
+                    currentWord <- Some word.VSObject
                     suggestions <- []
                     let! source = openDocumentTracker.TryGetDocumentText doc.FilePath
-                    let vsDocument = VSDocument(source, doc.FilePath, point.Snapshot)
+                    let vsDocument = VSDocument(source, doc.FilePath, point.Snapshot.VSObject)
                     let! symbolRange, recordExpression, recordDefinition, insertionPos =
                         tryFindRecordDefinitionFromPos codeGenService project point vsDocument
                     // Recheck cursor position to ensure it's still in new word
-                    let! point = buffer.GetSnapshotPoint view.Caret.Position
+                    let! point = buffer.GetSnapshotPoint (FSharp.EditingServices.BufferModel.CaretPosition view.Caret.Position)
                     if point.InSpan symbolRange && shouldGenerateRecordStub recordExpression recordDefinition then
                         return! Some (recordExpression, recordDefinition, insertionPos, word.Snapshot)
                     else
@@ -106,8 +107,8 @@ type RecordStubGenerator
     member __.Changed = changed.Publish
     member __.CurrentWord = 
         currentWord |> Option.map (fun word ->
-            if buffer.CurrentSnapshot = word.Snapshot then word
-            else word.TranslateTo(buffer.CurrentSnapshot, SpanTrackingMode.EdgeExclusive))
+            if buffer.CurrentSnapshot.VSObject = word.Snapshot then word
+            else word.TranslateTo(buffer.CurrentSnapshot.VSObject, SpanTrackingMode.EdgeExclusive))
     member __.Suggestions = suggestions
 
     interface IDisposable with

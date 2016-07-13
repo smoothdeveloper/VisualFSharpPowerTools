@@ -3,7 +3,7 @@
 open System
 open System.Text
 open Microsoft.VisualStudio.Text.Editor
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open FSharpVSPowerTools
 open FSharpVSPowerTools.ProjectSystem
 open FSharpVSPowerTools.StringBuilder

@@ -1,7 +1,6 @@
 ﻿namespace FSharpVSPowerTools.CodeFormatting
 
 open System
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Formatting
 open Microsoft.VisualStudio.Shell.Interop
@@ -12,6 +11,7 @@ open FSharpVSPowerTools.ProjectSystem
 open FSharpVSPowerTools.AsyncMaybe
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open System.Threading
+open FSharp.EditingServices.BufferModel
 
 [<NoComparison>]
 type FormattingResult = 
@@ -25,7 +25,7 @@ type FormattingResult =
 type CommandBase() =
     member val TextView: IWpfTextView = null with get, set
     member val Services: CodeFormattingServices = null with get, set
-    member x.TextBuffer: ITextBuffer = x.TextView.TextBuffer
+    member x.TextBuffer: ITextBuffer = ITextBuffer(x.TextView.TextBuffer)
     abstract Execute: unit -> unit
 
 [<AbstractClass>]
@@ -38,7 +38,7 @@ type FormatCommand(getConfig: Func<FormatConfig>) =
     let uiContext = SynchronizationContext.Current
                          
     member x.TryCreateTextUndoTransaction() =
-        let textBufferUndoManager = x.Services.TextBufferUndoManagerProvider.GetTextBufferUndoManager(x.TextBuffer)
+        let textBufferUndoManager = x.Services.TextBufferUndoManagerProvider.GetTextBufferUndoManager(x.TextBuffer.VSObject)
 
         // It is possible for an ITextBuffer to have a null ITextUndoManager.  This will happen in 
         // cases like the differencing viewer.  If VS doesn't consider the document to be editable then 
@@ -85,8 +85,8 @@ type FormatCommand(getConfig: Func<FormatConfig>) =
 
             try
                 let! filePath = 
-                    match x.Services.TextDocumentFactoryService.TryGetTextDocument(x.TextBuffer) with
-                    | true, textDocument ->
+                    match x.Services.TextDocumentFactoryService.TryGetTextDocument(ITextBuffer x.TextBuffer.VSObject) with
+                    | Some textDocument ->
                         Some textDocument.FilePath
                     | _ -> None
                 let! source = x.Services.OpenDocumentTracker.TryGetDocumentText filePath
@@ -101,9 +101,10 @@ type FormatCommand(getConfig: Func<FormatConfig>) =
                 if isValid then
                     do! Async.SwitchToContext uiContext |> liftAsync
                     let (caretPos, scrollBarPos, currentSnapshot) = x.TakeCurrentSnapshot()
-                    x.TextBuffer.Replace(
-                        Span(formattingResult.OldTextStartIndex, formattingResult.OldTextLength),
-                        formattingResult.NewText) |> ignore
+                    x.TextBuffer.Replace 
+                        (Span(VSSpan(formattingResult.OldTextStartIndex, formattingResult.OldTextLength)))
+                        formattingResult.NewText
+                        |> ignore
                     x.SetNewCaretPosition(caretPos, scrollBarPos, currentSnapshot)
                     return! Some()
                 else
@@ -124,7 +125,7 @@ type FormatCommand(getConfig: Func<FormatConfig>) =
             })
        
     member x.TakeCurrentSnapshot() =
-        let caretPos = x.TextView.Caret.Position.BufferPosition
+        let caretPos = SnapshotPoint(x.TextView.Caret.Position.BufferPosition)
         let originalSnapshot = x.TextBuffer.CurrentSnapshot
         // Get start line of scroll bar
         let scrollBarLine = x.TextView.TextViewLines |> Seq.tryFind (fun l -> l.VisibilityState <> VisibilityState.Hidden)

@@ -1,8 +1,8 @@
 ﻿namespace FSharpVSPowerTools.SyntaxColoring.UnusedSymbols
 
+open FSharp.EditingServices.BufferModel
 open System
 open System.IO
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Classification
 open FSharpVSPowerTools
 open FSharpVSPowerTools.SourceCodeClassifier
@@ -90,10 +90,10 @@ type UnusedSymbolClassifier
             let! buffer = Option.ofNull doc.TextBuffer
             return buffer.CurrentSnapshot }
 
-    let triggerClassificationChanged snapshot reason =
+    let triggerClassificationChanged (snapshot: ITextSnapshot) reason =
         let span = SnapshotSpan(snapshot, 0, snapshot.Length)
-        classificationChanged.Trigger(self, ClassificationChangedEventArgs span)
-        unusedTasgChanged.Trigger(self, SnapshotSpanEventArgs span)
+        classificationChanged.Trigger(self, ClassificationChangedEventArgs span.VSObject)
+        unusedTasgChanged.Trigger(self, Microsoft.VisualStudio.Text.SnapshotSpanEventArgs span.VSObject)
         debug "ClassificationChanged and UnusedTasgChanged events have been triggered by %s" reason
 
     let getOpenDeclarations filePath project ast getTextLineOneBased = 
@@ -277,7 +277,7 @@ type UnusedSymbolClassifier
         match state.Value with
         | State.Data { Data.Spans = spans }
         | State.Updating (Some { Data.Spans = spans }, _) ->
-            getClassificationSpans spans targetSnapshotSpan classificationRegistry
+            getClassificationSpans spans targetSnapshotSpan (IClassificationTypeRegistryService classificationRegistry)
         | State.NoData ->
             // Only schedule an update on signature files
             if isSignatureFile doc.FilePath then
@@ -289,7 +289,7 @@ type UnusedSymbolClassifier
     interface IClassifier with
         // It's called for each visible line of code
         member __.GetClassificationSpans span =
-            upcast (protectOrDefault (fun _ -> getClassificationSpans span) [||])
+            upcast (protectOrDefault (fun _ -> getClassificationSpans (SnapshotSpan span) |> Array.map(fun i -> i.VSObject)) [||])
 
         [<CLIEvent>] member __.ClassificationChanged = classificationChanged.Publish
 
@@ -301,10 +301,10 @@ type UnusedSymbolClassifier
                     data.Spans.Spans
                     |> Array.choose (fun wordSpan ->
                         fromRange data.Snapshot wordSpan.ColumnSpan.WordSpan.Range.Value
-                        |> Option.map (fun span -> TagSpan(span, UnusedDeclarationTag()) :> ITagSpan<_>)))
+                        |> Option.map (fun span -> TagSpan(span.VSObject, UnusedDeclarationTag()) :> ITagSpan<_>)))
                 |> Option.getOrElse [||]
 
-            protectOrDefault (fun _ -> getTags spans :> _) Seq.empty
+            protectOrDefault (fun _ -> getTags (NormalizedSnapshotSpanCollection spans) :> _) Seq.empty
 
         [<CLIEvent>] member __.TagsChanged = unusedTasgChanged.Publish
 

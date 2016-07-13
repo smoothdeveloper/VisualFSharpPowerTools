@@ -1,6 +1,6 @@
 ﻿namespace FSharpVSPowerTools.HighlightUsage
 
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio
 open Microsoft.VisualStudio.OLE.Interop

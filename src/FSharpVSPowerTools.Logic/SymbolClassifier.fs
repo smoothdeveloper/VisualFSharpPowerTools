@@ -2,8 +2,7 @@
 
 open System
 open System.IO
-open Microsoft.VisualStudio.Text
-open Microsoft.VisualStudio.Text.Classification
+open FSharp.EditingServices.BufferModel
 open FSharpVSPowerTools
 open FSharpVSPowerTools.SourceCodeClassifier
 open FSharpVSPowerTools.ProjectSystem
@@ -41,9 +40,9 @@ type SymbolClassifier
     let state = Atom State.NoData
     let dte = serviceProvider.GetDte()
         
-    let triggerClassificationChanged snapshot reason =
+    let triggerClassificationChanged (snapshot: ITextSnapshot) reason =
         let span = SnapshotSpan(snapshot, 0, snapshot.Length)
-        classificationChanged.Trigger(self, ClassificationChangedEventArgs span)
+        classificationChanged.Trigger(self, Microsoft.VisualStudio.Text.Classification.ClassificationChangedEventArgs span.VSObject)
         debug "ClassificationChanged event has been triggered by %s" reason
 
     let checkAstIsNotEmpty (ast: ParsedInput) =
@@ -146,10 +145,10 @@ type SymbolClassifier
             [||]
         | State.Updating _ -> [||]
 
-    interface IClassifier with
+    interface Microsoft.VisualStudio.Text.Classification.IClassifier with
         // It's called for each visible line of code
         member __.GetClassificationSpans span =
-            upcast (protectOrDefault (fun _ -> getClassificationSpans span) [||])
+            upcast (protectOrDefault (fun _ -> (getClassificationSpans (SnapshotSpan span)) |> Array.map (fun i -> i.VSObject)) [||])
 
         [<CLIEvent>]
         member __.ClassificationChanged = classificationChanged.Publish

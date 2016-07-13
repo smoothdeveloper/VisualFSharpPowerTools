@@ -7,7 +7,7 @@ open System.Windows.Media
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Utilities
 open System.Windows.Controls
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open System.Windows.Input
 open Microsoft.VisualStudio.Text.Tagging
 open FSharpVSPowerTools.ProjectSystem
@@ -27,12 +27,12 @@ type UnusedDeclarationMargin(textView: IWpfTextView,
     let updateDisplay (CallInUIContext callInUIContext) =
         callInUIContext <| fun _ ->
             if not textView.IsClosed then
-                let buffer = textView.TextBuffer
+                let buffer = ITextBuffer textView.TextBuffer
                 let span = buffer.CurrentSnapshot.FullSpan
                 
                 let data =
-                    tagAggregator.GetTags(span)
-                    |> Seq.collect (fun mappedSpan -> mappedSpan.Span.GetSpans(buffer))
+                    tagAggregator.GetTags(span.VSObject)
+                    |> Seq.collect (fun mappedSpan -> mappedSpan.Span.GetSpans(buffer.VSObject))
                     |> Seq.map (fun span -> 
                         let pos = span.Start.Position
                         buffer.CurrentSnapshot.GetLineNumberFromPosition(pos), pos)
@@ -65,7 +65,7 @@ type UnusedDeclarationMargin(textView: IWpfTextView,
                     Canvas.SetTop(marker, lineStart + float lineNo * lineHeight)
                     marker.MouseDown.Add(fun _ -> 
                         let line = textView.TextSnapshot.GetLineFromLineNumber(lineNo)
-                        textView.Caret.MoveTo(VirtualSnapshotPoint(textView.TextSnapshot, pos)) |> ignore
+                        textView.Caret.MoveTo(VirtualSnapshotPoint(ITextSnapshot textView.TextSnapshot, pos)) |> ignore
                         textView.ViewScroller.EnsureSpanVisible(SnapshotSpan(line.Start, 0), EnsureSpanVisibleOptions.ShowStart))
                     children.Add(marker) |> ignore
 

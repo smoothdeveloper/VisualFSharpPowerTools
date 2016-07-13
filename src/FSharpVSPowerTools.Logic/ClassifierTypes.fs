@@ -1,6 +1,7 @@
 namespace FSharpVSPowerTools.SyntaxColoring
 
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
+//open Microsoft.VisualStudio.Text.RefactorExtensions
 open FSharpVSPowerTools
 open Microsoft.FSharp.Compiler
 
@@ -23,7 +24,7 @@ type internal CategorizedSnapshotSpan (columnSpan: CategorizedColumnSpan<ITextSn
                       Line = span.Start.GetContainingLine().LineNumber }))
             |> Option.map (fun span ->
                 if span.Span.Snapshot <> targetSnapshot then
-                    let newSpan = span.Span.TranslateTo(targetSnapshot, SpanTrackingMode.EdgeExclusive)
+                    let newSpan = span.Span.TranslateToEdgeExclusive(targetSnapshot)
                     { Span = newSpan; Line = newSpan.Start.GetContainingLine().LineNumber }
                 else span)) 
         |> ignore
@@ -36,7 +37,7 @@ type internal CategorizedSnapshotSpans =
 
 [<AutoOpen>]
 module internal Utils =
-    open Microsoft.VisualStudio.Text.Classification
+    //open Microsoft.VisualStudio.Text.Classification
 
     let log (f: unit -> string) = Logging.logInfo (fun _ -> "[SymbolClassifier] " + f()) 
 

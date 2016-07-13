@@ -15,8 +15,10 @@ type String with
         if index < 0 then self elif index > self.Length then "" else self.Substring index
 
 open System.Diagnostics
-open Microsoft.VisualStudio.Text
-open Microsoft.VisualStudio.Text.Editor
+open FSharp.EditingServices.BufferModel
+//open Microsoft.VisualStudio.Text
+//open Microsoft.VisualStudio.Text.Editor
+//open Microsoft.VisualStudio.Text.RefactorExtensions
 open Microsoft.FSharp.Compiler.Range
 
 let fromRange (snapshot: ITextSnapshot) (startLine, startColumn, endLine, endColumn) =
@@ -24,11 +26,7 @@ let fromRange (snapshot: ITextSnapshot) (startLine, startColumn, endLine, endCol
     Debug.Assert(startLine <> endLine || startColumn <= endColumn, 
                  sprintf "Single-line pos, but startCol = %d, endCol = %d" startColumn endColumn)
     try 
-        let startPos = snapshot.GetLineFromLineNumber(startLine - 1).Start.Position + startColumn
-        let endPos = snapshot.GetLineFromLineNumber(endLine - 1).Start.Position + endColumn
-        Debug.Assert(startPos <= endPos, sprintf "startPos = %d, endPos = %d" startPos endPos)
-        let length = endPos - startPos
-        Some (SnapshotSpan(snapshot, startPos, length))
+        Some (snapshot.snapshotSpanFromRange(startLine - 1, startColumn, endLine - 1, endColumn))
     with e ->
         fail "Attempting to create a SnapshotSpan (StartLine = %d, StartColumn = %d, EndLine = %d, EndColumn = %d) in a snapshot length = %d results in: %O"
              startLine startColumn endLine endColumn snapshot.Length e
@@ -73,96 +71,6 @@ let inline private isTypeParameter (prefix: char) (s: string) =
 
 let isGenericTypeParameter = isTypeParameter '''
 let isStaticallyResolvedTypeParameter = isTypeParameter '^'
-
-type SnapshotPoint with
-    member x.InSpan (span: SnapshotSpan) = 
-        // The old snapshot might not be available anymore, we compare on updated snapshot
-        let point = x.TranslateTo(span.Snapshot, PointTrackingMode.Positive)
-        point.CompareTo span.Start >= 0 && point.CompareTo span.End <= 0
-
-type ITextSnapshot with
-    /// SnapshotSpan of the entirety of this TextSnapshot
-    member x.FullSpan =
-        SnapshotSpan(x, 0, x.Length)
-
-    /// Get the start and end line numbers of a snapshotSpan based on this textSnapshot
-    /// returns a tuple of (startLineNumber, endLineNumber)
-    member inline x.LineBounds (snapshotSpan:SnapshotSpan) =
-        let startLineNumber = x.GetLineNumberFromPosition (snapshotSpan.Span.Start)
-        let endLineNumber = x.GetLineNumberFromPosition (snapshotSpan.Span.End)
-        (startLineNumber, endLineNumber)
-
-    /// Get the text at line `num`
-    member inline x.LineText num =  x.GetLineFromLineNumber(num).GetText()
-
-type SnapshotSpan with
-    member inline x.StartLine = x.Snapshot.GetLineFromPosition (x.Start.Position)
-    member inline x.StartLineNum = x.Snapshot.GetLineNumberFromPosition x.Start.Position
-    member inline x.StartColumn = x.Start.Position - x.StartLine.Start.Position 
-    member inline x.EndLine = x.Snapshot.GetLineFromPosition (x.End.Position)
-    member inline x.EndLineNum  = x.Snapshot.GetLineNumberFromPosition x.End.Position
-    member inline x.EndColumn = x.End.Position - x.EndLine.Start.Position
-
-    member x.ModStart (num) = SnapshotSpan(SnapshotPoint (x.Snapshot, x.Start.Position + num), x.End)
-    member x.ModEnd (num) = SnapshotSpan(x.Start, (SnapshotPoint (x.Snapshot,x.End.Position + num)))
-
-    member x.ModBoth m1 m2 =
-        SnapshotSpan(SnapshotPoint (x.Snapshot, x.Start.Position + m1),
-                     SnapshotPoint (x.Snapshot, x.End.Position + m2))
-
-    /// get the position of the token found at (line,.col) if token was not found then -1,-1
-    member x.PositionOf (token:string) =
-        let firstLine = x.StartLineNum
-        let lastLine = x.EndLineNum
-        let lines = [| for idx in firstLine .. lastLine -> x.Snapshot.LineText idx |]
-
-        let withinBounds (line, col) =
-            match line, col with
-            | -1,-1 -> -1,-1 // fast terminate if token wasn't found
-            |  l, c when c < x.StartColumn &&  l = firstLine -> -1,-1
-            |  l, c when c > x.EndColumn &&  l = lastLine -> -1,-1
-            | _ -> line,col
-
-        let rec loop idx =
-            if idx > lines.Length then -1,-1 else
-            match lines.[idx].IndexOf(token) with
-            | -1 -> loop (idx+1)
-            | toki -> (firstLine+idx,toki)
-        
-        loop 0 |> withinBounds
-
-    /// Return corresponding zero-based FCS range
-    /// (lineStart, colStart, lineEnd, colEnd)
-    member inline x.ToRange () =
-        (x.StartLineNum, x.StartColumn, x.EndLineNum, x.EndColumn-1)
-
-type ITextBuffer with
-    member x.GetSnapshotPoint (position: CaretPosition) = 
-        Option.ofNullable <| position.Point.GetPoint(x, position.Affinity)
-    
-    member x.TriggerTagsChanged (sender: obj) (event: Event<_,_>) =
-        let span = x.CurrentSnapshot.FullSpan
-        event.Trigger(sender, SnapshotSpanEventArgs(span))
-
-type ITextView with
-    /// Return a simple zero-based (line, column) tuple from 
-    /// actual caret position in this ITextView
-    member x.GetCaretPosition () =
-        maybe {
-          let! point = x.TextBuffer.GetSnapshotPoint x.Caret.Position
-          let line = point.Snapshot.GetLineNumberFromPosition point.Position
-          let col = point.Position - point.GetContainingLine().Start.Position
-          return (line, col)
-        }
-
-    /// Return Microsoft.FSharp.Compiler.Range.pos from actual 
-    /// caret position in this ITextView taking care of off by 
-    /// 1 indexing between VS and FCS
-    member x.PosAtCaretPosition () =
-        maybe {
-          let! line, col = x.GetCaretPosition()
-          return Microsoft.FSharp.Compiler.Range.mkPos (line + 1) (col + 1)
-        }
 
 open System.Runtime.InteropServices
 open Microsoft.VisualStudio

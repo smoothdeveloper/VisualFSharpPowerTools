@@ -1,9 +1,9 @@
 ﻿namespace FSharpVSPowerTools.ProjectSystem
 
+open FSharp.EditingServices.BufferModel
 open System
 open System.Text
 open System.ComponentModel.Composition
-open Microsoft.VisualStudio.Text
 open Microsoft.VisualStudio.Text.Editor
 open System.Collections.Generic
 open FSharpVSPowerTools
@@ -45,16 +45,13 @@ type OpenDocumentsTracker [<ImportingConstructor>](textDocumentFactoryService: I
         | Some doc -> addDoc path (f doc)
         | None -> ()
 
-    let tryGetDocument buffer = 
-        match textDocumentFactoryService.TryGetTextDocument buffer with
-        | true, doc -> Some doc
-        | _ -> None
+    let tryGetDocument buffer = textDocumentFactoryService.TryGetTextDocument buffer
 
     interface IOpenDocumentsTracker with
         member __.RegisterView (view: IWpfTextView) = 
             ForegroundThreadGuard.CheckThread()
             maybe {
-                let! doc = tryGetDocument view.TextBuffer
+                let! doc = tryGetDocument (ITextBuffer view.TextBuffer)
                 let path = doc.FilePath
                 
                 let textBufferChanged (args: TextContentChangedEventArgs) =
@@ -64,7 +61,7 @@ type OpenDocumentsTracker [<ImportingConstructor>](textDocumentFactoryService: I
                                                               LastChangeTime = DateTime.UtcNow })
                         documentChanged.Trigger path
                 
-                let textBufferChangedSubscription = view.TextBuffer.ChangedHighPriority.Subscribe textBufferChanged
+                let textBufferChangedSubscription = view.TextBuffer.ChangedHighPriority.Subscribe (textBufferChanged << TextContentChangedEventArgs)
                 
                 let rec viewClosed _ =
                     match tryFindDoc path with
@@ -88,7 +85,7 @@ type OpenDocumentsTracker [<ImportingConstructor>](textDocumentFactoryService: I
                 tryFindDoc path
                 |> Option.map (fun doc -> { doc with ViewCount = doc.ViewCount + 1 })
                 |> Option.getOrTry (fun _ ->
-                    OpenDocument.Create doc view.TextBuffer.CurrentSnapshot doc.Encoding lastWriteTime)
+                    OpenDocument.Create doc (ITextSnapshot view.TextBuffer.CurrentSnapshot) doc.Encoding lastWriteTime)
                 |> addDoc path
             } |> ignore
         

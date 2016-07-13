@@ -1,17 +1,16 @@
 ﻿namespace FSharpVSPowerTools.ProjectSystem
 
 open System
+open FSharp.EditingServices.BufferModel
 open Microsoft.FSharp.Compiler.SourceCodeServices
 open Microsoft.VisualStudio.Shell.Interop
 open System.ComponentModel.Composition
-open Microsoft.VisualStudio
 open Microsoft.VisualStudio.Shell
 open EnvDTE
 open FSharpVSPowerTools
 open System.IO
 open System.Diagnostics
 open System.Collections.Generic
-open Microsoft.VisualStudio.Text
 open System.Collections.Concurrent
 open System.Runtime.InteropServices
 

@@ -1,10 +1,9 @@
 ﻿namespace FSharpVSPowerTools.Navigation
-
+open FSharp.EditingServices.BufferModel
 open System.IO
 open System.Threading
 open System.Security
 open System.Collections.Generic
-open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio
 open Microsoft.VisualStudio.TextManager.Interop
 open Microsoft.VisualStudio.OLE.Interop
@@ -29,7 +28,7 @@ type NavigateToMetadataService [<ImportingConstructor>]
     (vsLanguageService: VSLanguageService,
      [<Import(typeof<SVsServiceProvider>)>]serviceProvider: IServiceProvider,
      projectFactory: ProjectFactory,
-     editorOptionsFactory: IEditorOptionsFactoryService) =
+     editorOptionsFactory: Microsoft.VisualStudio.Text.Editor.IEditorOptionsFactoryService) =
     
     // Use a single cache across text views
     static let xmlDocCache = Dictionary<string, IVsXMLMemberIndex>()
@@ -167,7 +166,7 @@ type NavigateToMetadataService [<ImportingConstructor>]
 
     // Now the input is an entity or a member/value.
     // We always generate the full enclosing entity signature if the symbol is a member/value
-    let tryCreateMetadataContext project textBuffer ast (span: SnapshotSpan) (fsSymbolUse: FSharpSymbolUse) = 
+    let tryCreateMetadataContext project textBuffer ast (span: FSharp.EditingServices.BufferModel.SnapshotSpan) (fsSymbolUse: FSharpSymbolUse) = 
         async {
             let fsSymbol = fsSymbolUse.Symbol
             let fileName = SignatureGenerator.getFileNameFromSymbol fsSymbol
@@ -178,7 +177,7 @@ type NavigateToMetadataService [<ImportingConstructor>]
 
             let filePath = Path.Combine(Path.GetTempPath(), subFolder, fileName)
             let editorOptions = editorOptionsFactory.GetOptions(textBuffer)
-            let indentSize = editorOptions.GetOptionValue((IndentSize()).Key)  
+            let indentSize = editorOptions.GetOptionValue((Microsoft.VisualStudio.Text.Editor.IndentSize()).Key)  
             let displayContext = fsSymbolUse.DisplayContext
             match VsShellUtilities.IsDocumentOpen(serviceProvider, filePath, Constants.guidLogicalTextView) with
             | true, _hierarchy, _itemId, _windowFrame ->

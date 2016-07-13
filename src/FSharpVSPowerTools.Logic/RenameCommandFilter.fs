@@ -2,7 +2,7 @@
 
 open System.IO
 open System.Windows
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio
 open Microsoft.VisualStudio.OLE.Interop

@@ -4,7 +4,7 @@ open System
 open System.IO
 open System.ComponentModel.Composition
 open Microsoft.VisualStudio.Language.Intellisense
-open Microsoft.VisualStudio.Text
+open FSharp.EditingServices.BufferModel
 open Microsoft.VisualStudio.Shell
 open Microsoft.VisualStudio.Utilities
 open Microsoft.VisualStudio.Shell.Interop

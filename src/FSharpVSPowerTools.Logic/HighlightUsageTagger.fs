@@ -1,14 +1,27 @@
-﻿namespace FSharpVSPowerTools.HighlightUsage
+﻿
+
+namespace FSharpVSPowerTools.Core.Features.HighlightUsage
+
+open System
+
+
+namespace FSharpVSPowerTools.HighlightUsage
 
 open System
 open System.IO
-open Microsoft.VisualStudio.Text
+
+open FSharp.EditingServices.BufferModel
+open Microsoft.VisualStudio.Text.RefactorExtensions
 open Microsoft.VisualStudio.Text.Editor
 open Microsoft.VisualStudio.Text.Tagging
+
 open FSharpVSPowerTools
 open FSharpVSPowerTools.AsyncMaybe
 open FSharpVSPowerTools.ProjectSystem
 open Microsoft.FSharp.Compiler.SourceCodeServices
+
+type SnapshotSpan = FSharp.EditingServices.BufferModel.SnapshotSpan
+type SnapshotPoint = FSharp.EditingServices.BufferModel.SnapshotPoint
 
 // Reference at http://social.msdn.microsoft.com/Forums/vstudio/en-US/8e0f71f6-4794-4f0e-9a63-a8b55bc22e00/predefined-textmarkertag?forum=vsx
 
@@ -37,9 +50,9 @@ type HighlightUsageTagger(doc: ITextDocument,
     let updateLock = obj()
     let mutable wordSpans = []
     let mutable currentWord: SnapshotSpan option = None
-    let mutable requestedPoint = SnapshotPoint()
+    let mutable requestedPoint = SnapshotPoint(VSSnapshotPoint())
 
-    let buffer = view.TextBuffer
+    let buffer = ITextBuffer view.TextBuffer
 
     // Perform a synchronous update, in case multiple background threads are running
     let synchronousUpdate (currentRequest, newSpans, newWord) =
@@ -48,7 +61,7 @@ type HighlightUsageTagger(doc: ITextDocument,
                 wordSpans <- newSpans
                 currentWord <- newWord
                 let span = buffer.CurrentSnapshot.FullSpan
-                tagsChanged.Trigger(self, SnapshotSpanEventArgs span))
+                tagsChanged.Trigger(self, Microsoft.VisualStudio.Text.SnapshotSpanEventArgs span.VSObject))
 
     let symbolUsesToSpans (word: SnapshotSpan) fileName (lastIdent: string) (symbolUses: FSharpSymbolUse []) =
         let filePath = Path.GetFullPathSafe(fileName)
@@ -98,7 +111,7 @@ type HighlightUsageTagger(doc: ITextDocument,
 
             // If the new cursor position is still within the current word (and on the same snapshot),
             // we don't need to check it.
-            match buffer.GetSnapshotPoint caretPos, currentWord with
+            match buffer.GetSnapshotPoint (FSharp.EditingServices.BufferModel.CaretPosition caretPos), currentWord with
             | Some point, Some cw when cw.Snapshot = view.TextSnapshot && point.InSpan cw -> 
                 ()
             | Some point, _ ->
